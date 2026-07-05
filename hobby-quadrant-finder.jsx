@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 // ---------- Hobby database ----------
 // traits: energy (pace/stimulation), creative, outdoor, structure, physical (bodily demand) — all 0-100
@@ -102,6 +102,17 @@ export default function HobbyQuadrant() {
   );
   const [showSolo, setShowSolo] = useState(false);
   const [pick, setPick] = useState(null);
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 700px)").matches
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 700px)");
+    const onChange = (e) => setIsMobile(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   const placed = useMemo(() => {
     const pool = showSolo ? HOBBIES : HOBBIES.filter((h) => h.social >= 50);
@@ -114,9 +125,10 @@ export default function HobbyQuadrant() {
       // in focus mode the chart only holds social hobbies, so stretch
       // the 50-100 social range across the full height for finer separation
       const yv = showSolo ? h.social : (h.social - 50) * 2;
+      const xPad = isMobile ? 16 : 9;
       return {
         ...h,
-        x: 9 + ((h.score - min) / span) * 82,
+        x: xPad + ((h.score - min) / span) * (100 - xPad * 2),
         y: 91 - (yv / 100) * 82,
       };
     });
@@ -126,21 +138,26 @@ export default function HobbyQuadrant() {
       const key = (p.x >= 50 ? "E" : "D") + (p.y <= 50 ? "S" : "N");
       byQuad[key].push(p);
     });
+    const cap = isMobile ? 4 : showSolo ? 5 : 6;
     pts = Object.entries(byQuad).flatMap(([k, arr]) =>
       arr
         .sort((a, b) => Math.abs(b.x - 50) - Math.abs(a.x - 50))
-        .slice(0, showSolo ? 5 : 6)
+        .slice(0, cap)
         .map((p) => ({ ...p, quad: k }))
     );
 
+    // chips are proportionally much wider on a narrow screen,
+    // so use a bigger horizontal collision threshold there
+    const xThresh = isMobile ? 48 : 26;
+    const yGap = isMobile ? 8 : 7.5;
     for (let iter = 0; iter < 40; iter++) {
       let moved = false;
       pts.sort((a, b) => a.y - b.y);
       for (let i = 0; i < pts.length; i++) {
         for (let j = i + 1; j < pts.length; j++) {
           const a = pts[i], b = pts[j];
-          if (Math.abs(a.x - b.x) < 26 && Math.abs(a.y - b.y) < 7.5) {
-            const push = (7.5 - Math.abs(a.y - b.y)) / 2 + 0.2;
+          if (Math.abs(a.x - b.x) < xThresh && Math.abs(a.y - b.y) < yGap) {
+            const push = (yGap - Math.abs(a.y - b.y)) / 2 + 0.2;
             a.y = Math.max(5, a.y - push);
             b.y = Math.min(95, b.y + push);
             moved = true;
@@ -150,7 +167,7 @@ export default function HobbyQuadrant() {
       if (!moved) break;
     }
     return pts;
-  }, [u, showSolo]);
+  }, [u, showSolo, isMobile]);
 
   const set = (key) => (e) => setU({ ...u, [key]: Number(e.target.value) });
 
@@ -296,6 +313,9 @@ export default function HobbyQuadrant() {
           </div>
           <div className="hq-axis-label hq-axis-bottom">
             {showSolo ? "↓ UNLIKELY TO MEET PEOPLE" : "↓ QUIETER SOCIAL SCENES"}
+          </div>
+          <div className="hq-axis-label hq-axis-x-mobile">
+            ← AVOID&nbsp;&nbsp;·&nbsp;&nbsp;ENJOY →
           </div>
           <div className="hq-footnote">
             Tags glide as you tune. Each opens a location-aware Google search in a new tab.
@@ -542,8 +562,47 @@ const css = `
   font-size: 11.5px; color: #7686A0;
 }
 
+.hq-axis-x-mobile { display: none; }
+
 @media (prefers-reduced-motion: reduce) {
   .hq-chip { transition: none; }
   .hq-orb-a, .hq-orb-b { animation: none; }
+}
+
+/* ---------- mobile ---------- */
+@media (max-width: 700px) {
+  .hq-page { padding: 26px 14px 40px; }
+
+  .hq-header { margin-bottom: 22px; }
+  .hq-title { font-size: clamp(32px, 10vw, 40px); }
+  .hq-sub { font-size: 14px; line-height: 1.55; }
+
+  .hq-layout { gap: 18px; }
+  .hq-panel { padding: 18px 16px; border-radius: 14px; }
+  .hq-slider-row { margin-bottom: 18px; }
+  .hq-slider-labels { font-size: 12.5px; margin-bottom: 7px; }
+  .hq-range::-webkit-slider-thumb { width: 24px; height: 24px; }
+  .hq-range::-moz-range-thumb { width: 24px; height: 24px; }
+
+  /* taller chart, full width, no rotated side labels */
+  .hq-chart { aspect-ratio: 3 / 4; border-radius: 12px; }
+  .hq-axis-side { display: none; }
+  .hq-chart-row { gap: 0; }
+  .hq-axis-x-mobile { display: block; text-align: center; margin-top: 6px; }
+  .hq-axis-top, .hq-axis-bottom { font-size: 9.5px; letter-spacing: .16em; }
+  .hq-axis-bottom { margin-top: 8px; }
+
+  .hq-chip {
+    font-size: 10px; padding: 4px 9px 4px 7px; gap: 5px;
+    border-radius: 999px;
+  }
+  .hq-chip-dot { width: 6px; height: 6px; }
+  .hq-corner { font-size: 8.5px; right: 6px; top: 6px; }
+  .hq-ring-2 { display: none; }
+
+  .hq-footnote { font-size: 10.5px; margin-top: 10px; }
+
+  /* calmer background on small screens */
+  .hq-orb-a, .hq-orb-b { display: none; }
 }
 `;
