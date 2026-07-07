@@ -386,7 +386,7 @@ function HobbyQuadrant() {
           <div className="hq-chart-row">
             <div className="hq-axis-label hq-axis-side hq-axis-left">← HOBBIES YOU'D AVOID</div>
 
-            <div className="hq-chart">
+            <div className="hq-chart" onClick={() => setSelected(null)}>
               <div className="hq-qglow" style={{ left: "50%", top: 0, background: "radial-gradient(circle at 70% 30%, rgba(94,219,165,.16), transparent 70%)" }} />
               <div className="hq-qglow" style={{ left: "50%", top: "50%", background: "radial-gradient(circle at 70% 70%, rgba(107,168,245,.14), transparent 70%)" }} />
               <div className="hq-qglow" style={{ left: 0, top: 0, background: "radial-gradient(circle at 30% 30%, rgba(240,121,110,.13), transparent 70%)" }} />
@@ -413,13 +413,52 @@ function HobbyQuadrant() {
                   key={p.name}
                   className={`hq-chip${pick && pick.name === p.name ? " hq-chip-picked" : ""}${selected && selected.name === p.name ? " hq-chip-selected" : ""}`}
                   style={{ left: `${p.x}%`, top: `${p.y}%`, "--hue": QUAD[p.quad].hue }}
-                  onClick={() => setSelected(p)}
+                  onClick={(e) => { e.stopPropagation(); setSelected(p); }}
                 >
                   <span className="hq-chip-dot" />
                   {inShortlist(p.name) && <span className="hq-chip-star">★</span>}
                   {p.name}
                 </button>
               ))}
+
+              {/* ---- Popover anchored at the clicked chip ---- */}
+              {selected && (() => {
+                const anchor = placed.find((p) => p.name === selected.name);
+                const ax = anchor ? anchor.x : 50;
+                const ay = anchor ? anchor.y : 50;
+                const below = ay < 45; // open downward when chip is near the top
+                const left = Math.max(isMobile ? 30 : 16, Math.min(isMobile ? 70 : 84, ax));
+                return (
+                  <div
+                    className={`hq-pop${below ? " below" : ""}`}
+                    style={{ left: `${left}%`, top: `${ay}%` }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button" className="hq-pop-close"
+                      onClick={() => setSelected(null)} aria-label="Close"
+                    >×</button>
+                    <div className="hq-pop-name">{selected.name}</div>
+                    <div className="hq-pop-why">{explain(selected, u)}</div>
+                    <div className="hq-pop-actions">
+                      <a
+                        className="hq-pop-go"
+                        href={searchUrl(selected)}
+                        target="_blank" rel="noopener noreferrer"
+                      >
+                        Find it near you →
+                      </a>
+                      <button
+                        type="button"
+                        className={`hq-pop-save${inShortlist(selected.name) ? " saved" : ""}`}
+                        onClick={() => toggleShortlist(selected.name)}
+                      >
+                        {inShortlist(selected.name) ? "★" : "☆"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="hq-axis-label hq-axis-side hq-axis-right">HOBBIES YOU'D ENJOY →</div>
@@ -430,34 +469,6 @@ function HobbyQuadrant() {
           <div className="hq-axis-label hq-axis-x-mobile">
             ← AVOID&nbsp;&nbsp;·&nbsp;&nbsp;ENJOY →
           </div>
-
-          {/* ---- Detail card ---- */}
-          {selected && (
-            <div className="hq-detail">
-              <button
-                type="button" className="hq-detail-close"
-                onClick={() => setSelected(null)} aria-label="Close"
-              >×</button>
-              <div className="hq-detail-name">{selected.name}</div>
-              <div className="hq-detail-why">{explain(selected, u)}</div>
-              <div className="hq-detail-actions">
-                <a
-                  className="hq-detail-go"
-                  href={searchUrl(selected)}
-                  target="_blank" rel="noopener noreferrer"
-                >
-                  Find it near you →
-                </a>
-                <button
-                  type="button"
-                  className={`hq-detail-save${inShortlist(selected.name) ? " saved" : ""}`}
-                  onClick={() => toggleShortlist(selected.name)}
-                >
-                  {inShortlist(selected.name) ? "★ Saved" : "☆ Save"}
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* ---- Shortlist ---- */}
           {shortlist.length > 0 && (
@@ -742,37 +753,49 @@ const css = `
 }
 
 /* detail card */
-.hq-detail {
-  position: relative;
-  margin-top: 14px; padding: 18px 20px;
-  background: rgba(255,255,255,.05);
-  border: 1px solid rgba(255,255,255,.14);
+/* popover anchored at the clicked chip */
+.hq-pop {
+  position: absolute; z-index: 30;
+  width: 236px;
+  transform: translate(-50%, calc(-100% - 16px)); /* above the chip */
+  background: rgba(16,23,40,.96);
+  border: 1px solid rgba(255,255,255,.18);
   border-radius: 14px;
+  padding: 14px 16px;
   backdrop-filter: blur(10px);
+  box-shadow: 0 16px 44px rgba(0,0,0,.55);
+  animation: hq-pop-in .16s ease-out;
+  cursor: default;
 }
-.hq-detail-close {
-  position: absolute; top: 10px; right: 12px;
+.hq-pop.below { transform: translate(-50%, 16px); } /* below when chip is near the top */
+@keyframes hq-pop-in {
+  from { opacity: 0; scale: .92; }
+  to { opacity: 1; scale: 1; }
+}
+.hq-pop-close {
+  position: absolute; top: 8px; right: 10px;
   background: none; border: none; color: #7686A0;
-  font-size: 20px; cursor: pointer; line-height: 1;
+  font-size: 19px; cursor: pointer; line-height: 1;
 }
-.hq-detail-close:hover { color: #E8ECF4; }
-.hq-detail-name { font-size: 19px; font-weight: 600; margin-bottom: 4px; }
-.hq-detail-why { font-size: 13.5px; color: #93A0B8; line-height: 1.55; margin-bottom: 14px; }
-.hq-detail-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.hq-detail-go {
+.hq-pop-close:hover { color: #E8ECF4; }
+.hq-pop-name { font-size: 16px; font-weight: 600; margin-bottom: 4px; padding-right: 16px; white-space: normal; }
+.hq-pop-why { font-size: 12.5px; color: #93A0B8; line-height: 1.5; margin-bottom: 12px; white-space: normal; font-family: 'Space Grotesk', sans-serif; }
+.hq-pop-actions { display: flex; gap: 8px; align-items: stretch; }
+.hq-pop-go {
+  flex: 1; text-align: center;
   background: linear-gradient(135deg, rgba(94,219,165,.22), rgba(94,219,165,.08));
   border: 1px solid #5EDBA5; border-radius: 10px;
-  padding: 9px 14px; text-decoration: none;
-  font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #5EDBA5;
+  padding: 8px 10px; text-decoration: none;
+  font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: #5EDBA5;
 }
-.hq-detail-go:hover { box-shadow: 0 0 16px rgba(94,219,165,.4); }
-.hq-detail-save {
+.hq-pop-go:hover { box-shadow: 0 0 16px rgba(94,219,165,.4); }
+.hq-pop-save {
   background: none; border: 1px solid rgba(232,180,79,.6); border-radius: 10px;
-  padding: 9px 14px; cursor: pointer;
-  font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #E8B44F;
+  padding: 8px 12px; cursor: pointer;
+  font-size: 14px; color: #E8B44F;
 }
-.hq-detail-save.saved { background: rgba(232,180,79,.16); }
-.hq-detail-save:hover { box-shadow: 0 0 14px rgba(232,180,79,.3); }
+.hq-pop-save.saved { background: rgba(232,180,79,.16); }
+.hq-pop-save:hover { box-shadow: 0 0 14px rgba(232,180,79,.3); }
 
 /* shortlist */
 .hq-shortlist { margin-top: 14px; }
@@ -808,6 +831,7 @@ const css = `
 @media (prefers-reduced-motion: reduce) {
   .hq-chip { transition: none; }
   .hq-chip-picked { animation: none; }
+  .hq-pop { animation: none; }
   .hq-orb-a, .hq-orb-b { animation: none; }
 }
 
@@ -838,10 +862,9 @@ const css = `
   .hq-corner { font-size: 8.5px; right: 6px; top: 6px; }
   .hq-ring-2 { display: none; }
 
-  .hq-detail { padding: 15px 16px; }
-  .hq-detail-name { font-size: 17px; }
-  .hq-detail-actions { flex-direction: column; }
-  .hq-detail-go, .hq-detail-save { text-align: center; }
+  .hq-pop { width: 200px; padding: 12px 13px; }
+  .hq-pop-name { font-size: 14.5px; }
+  .hq-pop-why { font-size: 11.5px; }
 
   .hq-footnote { font-size: 10.5px; margin-top: 10px; }
   .hq-orb-a, .hq-orb-b { display: none; }
